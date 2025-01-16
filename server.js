@@ -85,9 +85,9 @@ app.get('/api/languages', async (req, res) => {
 });
 
 // Serve the index.html file for any other routes
-app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// app.get('*', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+// });
 
 // Start the server
 app.listen(PORT, () => {
