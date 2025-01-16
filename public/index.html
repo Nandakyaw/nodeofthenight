@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Listings</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Modal for course details -->
+    <div id="courseModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6" id="courseModalContent">
+                <!-- Modal content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <nav class="bg-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4">Course Marketplace</h1>
+            
+            <!-- Search -->
+            <div class="flex flex-col md:flex-row gap-4 mb-4">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search courses..." 
+                    class="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Loading Spinner -->
+        <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+
+        <!-- Course Grid -->
+        <div id="courseGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Course cards will be inserted here -->
+        </div>
+
+        <!-- Pagination -->
+        <div class="mt-8 flex justify-center items-center space-x-2">
+            <button id="prevPage" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                Previous
+            </button>
+            <span id="pageInfo" class="text-gray-600"></span>
+            <button id="nextPage" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed">
+                Next
+            </button>
+        </div>
+    </main>
+
+    <script>
+        const state = {
+            currentPage: 1,
+            totalPages: 1,
+            itemsPerPage: 9,
+            searchTerm: '',
+            courses: new Map() // Store course data
+        };
+
+        let debounceTimeout;
+
+        async function fetchCourses(page) {
+            const loading = document.getElementById('loading');
+            loading.classList.remove('hidden');
+
+            try {
+                const params = new URLSearchParams({
+                    page,
+                    limit: state.itemsPerPage,
+                    sortBy: 'sale_start'
+                });
+
+                if (state.searchTerm) params.append('search', state.searchTerm);
+
+                const response = await fetch(`/api/courses?${params}`);
+                const data = await response.json();
+                
+                // Store course data
+                data.items.forEach(course => {
+                    state.courses.set(course.slug, course);
+                });
+
+                state.totalPages = data.totalPages;
+                updatePagination();
+                renderCourses(data.items);
+            } catch (error) {
+                console.error('Error fetching courses:', error);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        function showCourseModal(course) {
+            const modal = document.getElementById('courseModal');
+            const content = document.getElementById('courseModalContent');
+
+            content.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-2xl font-bold text-gray-800">${course.name}</h2>
+                    <button onclick="closeCourseModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <img src="${course.image}" alt="${course.name}" class="w-full h-64 object-cover rounded-lg mb-4">
+                <div class="prose max-w-none">
+                    ${course.description}
+                </div>
+                <div class="mt-6 flex justify-between items-center">
+                    <div>
+                        <p class="text-lg font-bold text-blue-600">
+                            ${course.sale_price === 0 ? 'FREE' : `$${course.sale_price || course.price}`}
+                        </p>
+                        <div class="text-sm text-gray-600 mt-2">
+                            <p><i class="fas fa-book-open mr-1"></i>${course.lectures} lectures</p>
+                            <p><i class="fas fa-eye mr-1"></i>${course.views} views</p>
+                            <p><i class="fas fa-tag mr-1"></i>${course.category} > ${course.subcategory}</p>
+                        </div>
+                    </div>
+                    <a href="${course.url}" target="_blank" 
+                       class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        Enroll Now
+                    </a>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCourseModal() {
+            const modal = document.getElementById('courseModal');
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        function renderCourses(courses) {
+            const courseGrid = document.getElementById('courseGrid');
+            courseGrid.innerHTML = '';
+
+            courses.forEach(course => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 cursor-pointer';
+                
+                const price = course.sale_price || course.price;
+                const formattedPrice = price === 0 ? 'FREE' : `$${price.toFixed(2)}`;
+
+                card.innerHTML = `
+                    <img src="${course.image}" alt="${course.name}" class="w-full h-48 object-cover">
+                    <div class="p-4">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-2 line-clamp-2">${course.name}</h2>
+                        <div class="flex items-center mb-2">
+                            <span class="text-sm text-gray-600 mr-2">
+                                <i class="fas fa-book-open mr-1"></i>${course.lectures} lectures
+                            </span>
+                            <span class="text-sm text-gray-600">
+                                <i class="fas fa-eye mr-1"></i>${course.views} views
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="text-lg font-bold text-blue-600">${formattedPrice}</span>
+                            <button class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    const courseData = state.courses.get(course.slug);
+                    if (courseData) {
+                        showCourseModal(courseData);
+                    }
+                });
+                
+                courseGrid.appendChild(card);
+            });
+        }
+
+        function updatePagination() {
+            const prevButton = document.getElementById('prevPage');
+            const nextButton = document.getElementById('nextPage');
+            const pageInfo = document.getElementById('pageInfo');
+
+            prevButton.disabled = state.currentPage === 1;
+            nextButton.disabled = state.currentPage === state.totalPages;
+            
+            pageInfo.textContent = `Page ${state.currentPage} of ${state.totalPages}`;
+        }
+
+        // Event Listeners
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (state.currentPage > 1) {
+                state.currentPage--;
+                fetchCourses(state.currentPage);
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            if (state.currentPage < state.totalPages) {
+                state.currentPage++;
+                fetchCourses(state.currentPage);
+            }
+        });
+
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(() => {
+                state.searchTerm = e.target.value;
+                state.currentPage = 1;
+                fetchCourses(1);
+            }, 500);
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('courseModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('courseModal')) {
+                closeCourseModal();
+            }
+        });
+
+        // Initialize
+        fetchCourses(state.currentPage);
+    </script>
+</body>
+</html>
