@@ -1,18 +1,4 @@
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
-const crypto = require('crypto');
-const path = require('path');
 
-const app = express();
-const PORT = 3000;
-const BASE_URL = 'https://cdn.real.discount/api';
-
-const ENCRYPTION_KEY = '12345678901234561234567890123456'; // 32-byte key
-const ENCRYPTION_IV = '1234567890123456'; // 16-byte IV
-
-app.use(cors());
-app.use(express.static('public'));
 
 // Function to encrypt a value
 function encrypt(value) {
